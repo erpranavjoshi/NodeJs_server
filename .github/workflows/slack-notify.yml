@@ -3,7 +3,7 @@ name: Notify Slack on File Changes
 on:
   push:
     branches:
-      - main  # Change this to your target branch
+      - master 
 
 jobs:
   notify:
@@ -13,13 +13,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2  # Fetch last two commits to compare changes
+          fetch-depth: 0  # Ensure full history is available
 
       - name: Get changed files
         id: changed_files
         run: |
-          echo "FILES=$(git diff --name-only HEAD^ HEAD | jq -R -s -c 'split("\n")[:-1]')" >> $GITHUB_ENV
-          echo "AUTHORS=$(git log --format='%an' HEAD^..HEAD | sort -u | jq -R -s -c 'split("\n")[:-1]')" >> $GITHUB_ENV
+          FILES=$(git diff --name-only HEAD^ HEAD | tr '\n' ',' | sed 's/,$//')
+          AUTHORS=$(git log --format='%an' HEAD^..HEAD | sort -u | tr '\n' ',' | sed 's/,$//')
+
+          echo "FILES=$FILES" >> $GITHUB_ENV
+          echo "AUTHORS=$AUTHORS" >> $GITHUB_ENV
 
       - name: Send Slack notification
         env:
@@ -27,8 +30,8 @@ jobs:
           REPO: ${{ github.repository }}
           BRANCH: ${{ github.ref_name }}
         run: |
-          MESSAGE=":memo: *Changes in ${REPO} on branch ${BRANCH}* \n\n"
-          MESSAGE+=":busts_in_silhouette: *Authors:* $(echo $AUTHORS | jq -r '. | join(", ")')\n\n"
-          MESSAGE+=":file_folder: *Changed Files:* \n$(echo $FILES | jq -r '. | join("\n")')"
+          MESSAGE="*📢 Changes in ${REPO} on branch ${BRANCH}*\n\n"
+          MESSAGE+="*👤 Authors:* ${AUTHORS}\n\n"
+          MESSAGE+="*📂 Changed Files:*\n$(echo ${FILES} | tr ',' '\n')"
 
-          curl -X POST -H 'Content-type: application/json' --data "{\"text\": \"$MESSAGE\"}" $SLACK_WEBHOOK_URL
+          curl -X POST -H 'Content-type: application/json' --data "{\"text\": \"$(echo "$MESSAGE" | jq -R -s '.')\"}" $SLACK_WEBHOOK_URL
