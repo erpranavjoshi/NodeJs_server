@@ -3,7 +3,7 @@ name: Notify Slack on File Changes
 on:
   push:
     branches:
-      - master 
+      - master  # Change this to your target branch
 
 jobs:
   notify:
@@ -18,8 +18,8 @@ jobs:
       - name: Get changed files
         id: changed_files
         run: |
-          FILES=$(git diff --name-only HEAD^ HEAD | tr '\n' ',' | sed 's/,$//')
-          AUTHORS=$(git log --format='%an' HEAD^..HEAD | sort -u | tr '\n' ',' | sed 's/,$//')
+          FILES=$(git diff --name-only HEAD^ HEAD | sed ':a;N;$!ba;s/\n/\\n/g')
+          AUTHORS=$(git log --format='%an' HEAD^..HEAD | sort -u | sed ':a;N;$!ba;s/\n/, /g')
 
           echo "FILES=$FILES" >> $GITHUB_ENV
           echo "AUTHORS=$AUTHORS" >> $GITHUB_ENV
@@ -32,6 +32,8 @@ jobs:
         run: |
           MESSAGE="*📢 Changes in ${REPO} on branch ${BRANCH}*\n\n"
           MESSAGE+="*👤 Authors:* ${AUTHORS}\n\n"
-          MESSAGE+="*📂 Changed Files:*\n$(echo ${FILES} | tr ',' '\n')"
+          MESSAGE+="*📂 Changed Files:*\n${FILES}"
 
-          curl -X POST -H 'Content-type: application/json' --data "{\"text\": \"$(echo "$MESSAGE" | jq -R -s '.')\"}" $SLACK_WEBHOOK_URL
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{\"text\": \"$(echo "$MESSAGE" | jq -Rs '.')\"}" \
+            $SLACK_WEBHOOK_URL
